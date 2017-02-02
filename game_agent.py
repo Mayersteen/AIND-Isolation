@@ -6,12 +6,18 @@ augment the test suite with your own test cases to further test your code.
 You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
+
 import random
+
+# ------------------------------------------------------------------------------
 
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
+
+
+# ------------------------------------------------------------------------------
 
 
 def custom_score(game, player):
@@ -34,8 +40,67 @@ def custom_score(game, player):
         The heuristic value of the current game state to the specified player.
     """
 
-    # TODO: finish this function!
-    raise NotImplementedError
+    # This function acts as a dispatch mechanism so that different methods can
+    # easily be tested against each other.
+    return scoring_function_lecture(game, player)
+
+
+def scoring_function_random(game, player):
+    """ This scoring function returns a random value."""
+    return random.random()
+
+
+def scoring_function_naive(game, player):
+    """ This function simply returns the number of legal moves for the given
+    player"""
+    return float(game.get_legal_moves(player).__len__())
+
+
+def scoring_function_altruistic(game, player):
+    """ This scoring function calculates the following score:
+
+        (1 * own moves) + (0.5 * opponent_moves)
+
+    This should ensure that an enemy move with more possibilities is not
+    taken out of the consideration. In a hand full of manual experiments it
+    seemed that situations where the number of own moves is 2 and the number
+    of opponent moves is between 2 and 5 still include a good chance to win.
+    As the moves are restricted to an L-Shape, the number of possible moves
+    compared to each other is not necessarily significant."""
+
+    ownMoves = game.get_legal_moves(player).__len__()
+    opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
+
+    return float(ownMoves + 0.5 * opponentMoves)
+
+
+def scoring_function_lecture(game, player):
+    """ This scoring function calculates the following score:
+
+        (1 * own moves) - (2 * opponent_moves)
+
+    This should ensure that an enemy move with less movement options is
+    weighted stronger than a move with less possible successor states."""
+
+    ownMoves = game.get_legal_moves(player).__len__()
+    opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
+
+    return float(ownMoves - 2 * opponentMoves)
+
+
+def scoring_function_scaling(game, player):
+    """ This scoring function will penalize states where the opponent has many
+    possible moves while the game progresses. In the beginning the penalty will
+    be low and whith increasing progress, the penalty increases. """
+
+    ownMoves = game.get_legal_moves(player).__len__()
+    opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
+    numberOfMaxMoves = game.height * game.width * 0.5
+    numberOfMovesDone = game.move_count
+    scalingFactor = 0.25 * numberOfMaxMoves
+
+    return float(ownMoves - (scalingFactor / numberOfMovesDone) * opponentMoves)
+# ------------------------------------------------------------------------------
 
 
 class CustomPlayer:
@@ -115,25 +180,62 @@ class CustomPlayer:
 
         self.time_left = time_left
 
-        # TODO: finish this function!
+        if not legal_moves:
+            return (-1, -1)
 
-        # Perform any required initializations, including selecting an initial
-        # move from the game board (i.e., an opening book), or returning
-        # immediately if there are no legal moves
+        # If the initial position was not set, set the player close to the
+        # middle. The // operator means INTEGER DIVISION.
+        if not game.move_count:
+            row = game.height // 2
+            col = game.width // 2
+            return (row, col)
+
+        # Ensure that a next move is always selected, even when the search
+        # function is not returning any information. To ensure that there is
+        # some dynamic involved the move is selected randomly.
+        best_possible_move = random.choice(legal_moves)
+        best_possible_score = float('-inf')
 
         try:
-            # The search method call (alpha beta or minimax) should happen in
-            # here in order to avoid timeout. The try/except block will
-            # automatically catch the exception raised by the search method
-            # when the timer gets close to expiring
-            pass
 
-        except Timeout:
-            # Handle any actions required at timeout, if necessary
-            pass
+            # The first iteration level is set to 1 in case of `self.iterative`
+            # being true, otherwise it is set to the search_depth which defines
+            # the maximum level to be recursed to.
+            if self.iterative:
+                depth = 1
+            else:
+                depth = self.search_depth
 
-        # Return the best move from the last completed search iteration
-        raise NotImplementedError
+            # Initialize an infinite loop to find the best possible value.
+            while True:
+
+                # Dispatch parameters to the method which was defined in the
+                # game setup.
+                score, possible_move = \
+                    getattr(self, self.method)(game, depth)
+
+                # update score and move if a better move was found
+                if score > best_possible_score:
+                    best_possible_score = score
+                    best_possible_move = possible_move
+
+                # in iterative mode, a new iteration should be triggered with
+                # an additional level of depth. This is done until a Timeout
+                # Exception is thrown or until all levels were discovered.
+                if self.iterative:
+                    depth += 1
+                else:
+                    break
+
+        except Timeout as t:
+            # When a Timeout Exception is catched, the last discovered best
+            # move is returned.
+            return best_possible_move
+
+        # Return the best move found.
+        return best_possible_move
+
+# ------------------------------------------------------------------------------
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -160,11 +262,79 @@ class CustomPlayer:
         tuple(int, int)
             The best move for the current branch; (-1, -1) for no legal moves
         """
+
+        # When the defined time is exhausted, a Timeout Exception is raised to
+        # end the search process.
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # If a win or lose of my player was found, the relating utility() value
+        # and the relating move are returned.
+        if game.is_winner(self) or game.is_loser(self):
+            return game.utility(self), game.get_player_location(self)
+
+        # When depth has reached 0, the nodes must be evaluted by calling the
+        # scoring function. The score of the relating move and the relating
+        # move are returned.
+        if depth == 0:
+            return self.score(game, self), game.get_player_location(self)
+
+        # Best score and move are initialized, with regard to the
+        # maximizing_player bool value.
+        best_score = float('-inf') if maximizing_player else float('+inf')
+        best_move = (-1, -1)
+
+        # Iterate over all possible children.
+        for move in game.get_legal_moves():
+
+            # A copy of the current game is created that reflects the current
+            # move. This is important to ensure progress in the search.
+            gamestate = game.forecast_move(move)
+
+            # Execute recursive minimax calls with depth reduced by one and
+            # maximizing_player flipped to the opposite.
+            score, _ = self.minimax(gamestate, depth-1, not maximizing_player)
+
+            # If the last iteration found a move with a better score, best_score
+            # and best_move are updated.
+            if self.score_is_better(score, best_score, maximizing_player):
+                best_score = score
+                best_move = move
+
+        return best_score, best_move
+
+# ------------------------------------------------------------------------------
+
+    def score_is_better(self, score, best_score, maximizing_player):
+        """This helper function evaluates two scores against each other and
+        evaluates if the new score is better than the latest best_score, with
+        respect to the maximizing_player bool value.
+
+        Parameters
+        ----------
+        score : float
+            Score that was found in the last search
+
+        best_score : float
+            Best score found so far
+
+        maximizing_player : bool
+            Flag indicating whether the current search depth corresponds to a
+            maximizing layer (True) or a minimizing layer (False)
+
+        Returns
+        ----------
+        bool
+            True if score is better than the best_score
+            False otherwise
+        """
+        if maximizing_player and score > best_score:
+            return True
+
+        if not maximizing_player and score < best_score:
+            return True
+
+# ------------------------------------------------------------------------------
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -198,8 +368,52 @@ class CustomPlayer:
         tuple(int, int)
             The best move for the current branch; (-1, -1) for no legal moves
         """
+
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # If a win or lose of my player was found, the relating utility() value
+        # and the relating move are returned.
+        if game.is_winner(self) or game.is_loser(self):
+            return game.utility(self), game.get_player_location(self)
+
+        # When depth has reached 0, the nodes must be evaluted by calling the
+        # scoring function. The score of the relating move and the relating
+        # move are returned.
+        if depth == 0:
+            return self.score(game, self), game.get_player_location(self)
+
+        # Best score and move are initialized, with regard to the
+        # maximizing_player bool value.
+        best_score = float('-inf') if maximizing_player else float('+inf')
+        best_move = (-1, -1)
+
+        # Iterate over all possible children.
+        for move in game.get_legal_moves():
+
+            # A copy of the current game is created that reflects the current
+            # move. This is important to ensure progress in the search.
+            gamestate = game.forecast_move(move)
+
+            # Execute recursive minimax calls with depth reduced by one and
+            # maximizing_player flipped to the opposite.
+            score, _ = self.alphabeta(gamestate, depth-1, alpha, beta, not maximizing_player)
+
+            # If the last iteration found a move with a better score, best_score
+            # and best_move are updated.
+            if self.score_is_better(score, best_score, maximizing_player):
+                best_score = score
+                best_move = move
+
+            # Alpha-Beta addition
+            if maximizing_player:
+                if best_score >= beta:
+                    break
+                alpha = max(alpha, best_score)
+
+            if not maximizing_player:
+                if best_score <= alpha:
+                    break
+                beta = min(beta, best_score)
+
+        return best_score, best_move

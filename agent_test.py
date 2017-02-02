@@ -140,11 +140,11 @@ def makeEvalStop(limit, timer, value=None):
     """
 
     def score(game, player):
-        if timer.time_left() < 0:
-            raise TimeoutError("Timer expired during search. You must " +
-                               "return an answer before the timer reaches 0.")
         if limit == game.counts[0]:
             timer.time_limit = 0
+        elif timer.time_left() < 0:
+            raise TimeoutError("Timer expired during search. You must " +
+                               "return an answer before the timer reaches 0.")
         return 0
 
     return score
@@ -422,7 +422,7 @@ class Project1Test(unittest.TestCase):
             self.assertIn(move, expected_moves[idx // 2], WRONG_MOVE.format(
                 method, test_depth, expected_moves[idx // 2], move))
 
-    @timeout(10)
+    @timeout(30)
     # @unittest.skip("Skip alpha-beta test.")  # Uncomment this line to skip test
     def test_alphabeta(self):
         """ Test CustomPlayer.alphabeta
@@ -534,6 +534,7 @@ class Project1Test(unittest.TestCase):
 
             self.assertTrue(chosen_move in legal_moves, INVALID_MOVE.format(
                 legal_moves, chosen_move))
+
 
 
 if __name__ == '__main__':
