@@ -2,7 +2,7 @@
 
 The following image illustrates the performance of the different tournament runs.
 
-![Tournament Performance][./performance.png]
+![Tournament Performance](./performance.png)
 
 The following data was used to create the graph.
 
