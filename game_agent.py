@@ -71,7 +71,7 @@ def scoring_function_altruistic(game, player):
     ownMoves = game.get_legal_moves(player).__len__()
     opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
 
-    return float(ownMoves + 0.5 * opponentMoves)
+    return ownMoves + 0.5 * opponentMoves
 
 
 def scoring_function_lecture(game, player):
@@ -85,7 +85,7 @@ def scoring_function_lecture(game, player):
     ownMoves = game.get_legal_moves(player).__len__()
     opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
 
-    return float(ownMoves - 2 * opponentMoves)
+    return ownMoves - 2. * opponentMoves
 
 
 def scoring_function_scaling(game, player):
