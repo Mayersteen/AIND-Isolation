@@ -269,7 +269,7 @@ Results:
 Student             75.71%
 ```
 
-## Scaling scoring function (center)
+## Adapting scoring function (center)
 
 The player stars at the center when he has the first move.
 
@@ -280,6 +280,8 @@ end game, the enemy should not get moves _for free_.
 
 The performance of this scoring function was comparable to the scoring function
 used in the lecture.
+
+![Adapting scoring function](./scoringfunction.png)
 
 ```
 *************************
