@@ -44,22 +44,23 @@ def custom_score(game, player):
     # easily be tested against each other.
     return scoring_function_lecture(game, player)
 
+# ------------------------------------------------------------------------------
 
 def scoring_function_random(game, player):
     """ This scoring function returns a random value."""
     return random.random()
 
+# ------------------------------------------------------------------------------
 
 def scoring_function_naive(game, player):
     """ This function simply returns the number of legal moves for the given
     player"""
     return float(game.get_legal_moves(player).__len__())
 
+# ------------------------------------------------------------------------------
 
-def scoring_function_altruistic(game, player):
+def scoring_function_adaptive(game, player):
     """ This scoring function calculates the following score:
-
-        (1 * own moves) + (0.5 * opponent_moves)
 
     This should ensure that an enemy move with more possibilities is not
     taken out of the consideration. In a hand full of manual experiments it
@@ -70,9 +71,13 @@ def scoring_function_altruistic(game, player):
 
     ownMoves = game.get_legal_moves(player).__len__()
     opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
+    numberOfMaxMoves = game.height * game.width
+    numberOfMovesDone = game.move_count
+    scalingFactor = 0.2 * numberOfMaxMoves
 
-    return ownMoves + 0.5 * opponentMoves
+    return float(ownMoves - (scalingFactor / numberOfMovesDone) * opponentMoves)
 
+# ------------------------------------------------------------------------------
 
 def scoring_function_lecture(game, player):
     """ This scoring function calculates the following score:
@@ -85,21 +90,56 @@ def scoring_function_lecture(game, player):
     ownMoves = game.get_legal_moves(player).__len__()
     opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
 
-    return ownMoves - 2. * opponentMoves
+    return 1.3 * ownMoves - 1.75 * opponentMoves
 
+# ------------------------------------------------------------------------------
 
-def scoring_function_scaling(game, player):
-    """ This scoring function will penalize states where the opponent has many
-    possible moves while the game progresses. In the beginning the penalty will
-    be low and whith increasing progress, the penalty increases. """
+def scoring_function_strategy(game, player):
 
-    ownMoves = game.get_legal_moves(player).__len__()
-    opponentMoves = game.get_legal_moves(game.get_opponent(player)).__len__()
-    numberOfMaxMoves = game.height * game.width * 0.5
-    numberOfMovesDone = game.move_count
-    scalingFactor = 0.25 * numberOfMaxMoves
+    # If we are in the beginning of the game, ...
+    if (game.move_count <= 0.2 * game.height * game.width):
+        return scoring_function_naive(game, player)
 
-    return float(ownMoves - (scalingFactor / numberOfMovesDone) * opponentMoves)
+    # If we are in the middle of the game, ...
+    if (game.move_count <= 0.75 * game.height * game.width):
+        return scoring_function_lecture(game, player)
+
+    # If we are in end-game, ...
+    return scoring_function_longest_path(game, player)
+
+# ------------------------------------------------------------------------------
+
+def scoring_function_longest_path(game, player):
+
+    """This scoring function should prefer moves that have a longer path for
+    the player than for the opponent. It should only be used in endgame as the
+    performance impact is significant!"""
+
+    own_longest_path = 0
+    nme_longest_path = 0
+
+    if not game.get_legal_moves(player):
+        return 0
+
+    for move in game.get_legal_moves(player):
+
+        gamestate = game.forecast_move(move)
+
+        score = scoring_function_longest_path(gamestate, player) + 1
+
+        if score > own_longest_path:
+            own_longest_path = score
+
+    for move in game.get_legal_moves(game.get_opponent(player)):
+
+        gamestate = game.forecast_move(move)
+
+        score = scoring_function_longest_path(gamestate, game.get_opponent(player)) + 1
+
+        if score > nme_longest_path:
+            nme_longest_path = score
+
+    return float(own_longest_path - nme_longest_path)
 # ------------------------------------------------------------------------------
 
 
